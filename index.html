@@ -10,16 +10,23 @@
 <body>
 <div class="wrap">
   <div class="header">
-    <h1>Texas Region</h1>
-    <span class="badge">JUN 2026 — 6 ACTUAL + 6 BUDGET</span>
+    <h1 id="scopeTitle">Texas Region</h1>
+    <span class="badge" id="scopeBadge">JUN 2026 — 6 ACTUAL + 6 BUDGET</span>
     <div class="kpi-strip" id="kpiStrip"></div>
   </div>
 
+  <!-- Drill: breadcrumb (where you are) + sibling buttons (where you can go) -->
+  <div class="drill" id="drill"></div>
+
+  <!-- Chart navigation: All / Scorecard / Gap / etc. -->
   <div class="nav" id="nav"></div>
 
+  <!-- Charts grid -->
   <div class="grid" id="grid"></div>
 
-  <div class="footer"><p>Fabricated data • Click to isolate</p></div>
+  <div class="footer">
+    <p>Fabricated data • Click a card to isolate · Click officer bars in chart ⑪ to drill in</p>
+  </div>
 </div>
 
 <!-- Order matters: config defines globals used by data, charts, and main -->
