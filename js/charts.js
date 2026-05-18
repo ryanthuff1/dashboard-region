@@ -1,12 +1,18 @@
 // ════════════════════════════════════════════════════════════════
-// CHART BUILDERS — one function per card
-// HTML cards take a container <div>; chart cards take a <canvas>
-// and must return the Chart instance for cleanup on rerender.
+// CHART BUILDERS — one function per card.
+//
+// Chart functions read globals from data.js (`monthly`, `actM`, `remM`,
+// `sum`) at call time — these are rebuilt by recompute(scope) in main.js
+// before each render, so charts automatically reflect the current scope.
 // ════════════════════════════════════════════════════════════════
+
+// Filter helper: drops lines with zero YTD budget (useful at officer scope
+// where overlay lines like Consumer II / Deposit IE are zero by design).
+const nonZeroBudget = (lines) => lines.filter(d => Math.abs(d.b) > 0.001);
 
 // ── ① Scorecard ──────────────────────────────────────────────────
 function buildScorecard(container) {
-  const lines = [
+  const allLines = [
     { label: 'FL Revenue',      a: sum(actM,'flRev'),    b: sum(actM,'bRev'),     fy: sum(monthly,'bRev') },
     { label: 'FL NII',          a: sum(actM,'flNII'),    b: sum(actM,'bNII'),     fy: sum(monthly,'bNII') },
     { label: 'FL NIOI',         a: sum(actM,'flNIOI'),   b: sum(actM,'bNIOI'),    fy: sum(monthly,'bNIOI') },
@@ -16,11 +22,13 @@ function buildScorecard(container) {
     { label: 'Treasury Mgmt',   a: sum(actM,'tm'),       b: sum(actM,'tm_b'),     fy: sum(monthly,'tm_b') },
     { label: 'PCARD',           a: sum(actM,'pc'),       b: sum(actM,'pc_b'),     fy: sum(monthly,'pc_b') },
     { label: 'Service Charges', a: sum(actM,'sv'),       b: sum(actM,'sv_b'),     fy: sum(monthly,'sv_b') },
-  ].map(d => {
+  ];
+
+  const lines = nonZeroBudget(allLines).map(d => {
     const v = d.a - d.b;
     const vp = (v / d.b) * 100;
-    const ev = d.inv ? -vp : vp;       // effective variance (inv flips sign for cost lines)
-    const rr = (d.a / ACT) * 12;       // annualized run rate
+    const ev = d.inv ? -vp : vp;
+    const rr = (d.a / ACT) * 12;
     const need = (d.fy - d.a) / (12 - ACT);
     const avg = d.a / ACT;
     const step = ((need - avg) / avg) * 100;
@@ -64,16 +72,17 @@ function buildScorecard(container) {
 
 // ── ② Gap to Plan ────────────────────────────────────────────────
 function buildGapChart(canvas) {
-  const gaps = [
-    { l: 'Treasury Mgmt', g: sum(actM,'tm')     - sum(actM,'tm_b') },
-    { l: 'Comm Loan II',  g: sum(actM,'commII') - sum(actM,'commII_b') },
-    { l: 'PCARD',         g: sum(actM,'pc')     - sum(actM,'pc_b') },
-    { l: 'Deposit IE*',   g: -(sum(actM,'depIE') - sum(actM,'depIE_b')) },  // inverted
-    { l: 'Merchant',      g: sum(actM,'me')     - sum(actM,'me_b') },
-    { l: 'Consumer II',   g: sum(actM,'consII') - sum(actM,'consII_b') },
-    { l: 'Service Chg',   g: sum(actM,'sv')     - sum(actM,'sv_b') },
-    { l: 'Other Fees',    g: sum(actM,'ot')     - sum(actM,'ot_b') },
-  ].sort((a, b) => a.g - b.g);
+  const allGaps = [
+    { l: 'Treasury Mgmt', g: sum(actM,'tm')     - sum(actM,'tm_b'),     b: sum(actM,'tm_b') },
+    { l: 'Comm Loan II',  g: sum(actM,'commII') - sum(actM,'commII_b'), b: sum(actM,'commII_b') },
+    { l: 'PCARD',         g: sum(actM,'pc')     - sum(actM,'pc_b'),     b: sum(actM,'pc_b') },
+    { l: 'Deposit IE*',   g: -(sum(actM,'depIE') - sum(actM,'depIE_b')), b: sum(actM,'depIE_b') },
+    { l: 'Merchant',      g: sum(actM,'me')     - sum(actM,'me_b'),     b: sum(actM,'me_b') },
+    { l: 'Consumer II',   g: sum(actM,'consII') - sum(actM,'consII_b'), b: sum(actM,'consII_b') },
+    { l: 'Service Chg',   g: sum(actM,'sv')     - sum(actM,'sv_b'),     b: sum(actM,'sv_b') },
+    { l: 'Other Fees',    g: sum(actM,'ot')     - sum(actM,'ot_b'),     b: sum(actM,'ot_b') },
+  ];
+  const gaps = nonZeroBudget(allGaps).sort((a, b) => a.g - b.g);
 
   return new Chart(canvas, {
     type: 'bar',
@@ -113,6 +122,9 @@ function buildCumulative(canvas) {
     }
   });
 
+  // Adaptive y-axis: scale to the data instead of hardcoded 0-115
+  const ymax = Math.max(...cumBgt) * 1.05;
+
   return new Chart(canvas, {
     type: 'line',
     data: {
@@ -125,7 +137,7 @@ function buildCumulative(canvas) {
     },
     options: {
       scales: {
-        y: { min: 0, max: 115, grid: { color: '#eee', drawBorder: false }, ticks: { callback: v => '$' + v } },
+        y: { min: 0, max: ymax, grid: { color: '#eee', drawBorder: false }, ticks: { callback: v => '$' + v.toFixed(0) } },
         x: { grid: { display: false } }
       }
     }
@@ -134,14 +146,16 @@ function buildCumulative(canvas) {
 
 // ── ④ Run Rate Gauges ────────────────────────────────────────────
 function buildGauges(container) {
-  const lines = [
+  const allLines = [
     { label: 'FL Revenue',    ytd: sum(actM,'flRev'),  fy: sum(monthly,'bRev') },
     { label: 'FL NII',        ytd: sum(actM,'flNII'),  fy: sum(monthly,'bNII') },
     { label: 'FL NIOI',       ytd: sum(actM,'flNIOI'), fy: sum(monthly,'bNIOI') },
     { label: 'Comm Loan II',  ytd: sum(actM,'commII'), fy: sum(monthly,'commII_b') },
     { label: 'Consumer II',   ytd: sum(actM,'consII'), fy: sum(monthly,'consII_b') },
     { label: 'Treasury Mgmt', ytd: sum(actM,'tm'),     fy: sum(monthly,'tm_b') },
-  ].map(d => {
+  ];
+
+  const lines = allLines.filter(d => Math.abs(d.fy) > 0.001).map(d => {
     const rr = (d.ytd / ACT) * 12;
     const pct = (rr / d.fy) * 100;
     const need = (d.fy - d.ytd) / (12 - ACT);
@@ -186,6 +200,11 @@ function buildCommLoans(canvas) {
   const actColors = monthly.map(d => d.isA ? COL.actual + 'cc' : 'transparent');
   const bgtColors = monthly.map(d => d.isA ? COL.budget + '33' : COL.budget + '1a');
 
+  // Adaptive y-axis
+  const allVals = [...bgtData, ...actData.filter(v => v != null)];
+  const ymax = Math.max(...allVals) * 1.10;
+  const ymin = Math.max(0, Math.min(...allVals) * 0.85);
+
   return new Chart(canvas, {
     type: 'bar',
     data: {
@@ -199,20 +218,27 @@ function buildCommLoans(canvas) {
     },
     options: {
       scales: {
-        y: { min: 13, max: 17.5, grid: { color: '#eee', drawBorder: false } },
+        y: { min: ymin, max: ymax, grid: { color: '#eee', drawBorder: false } },
         x: { grid: { display: false } }
       }
     }
   });
 }
 
-// ── ⑥ Deposits — Balance & Cost ──────────────────────────────────
+// ── ⑥ Deposits ───────────────────────────────────────────────────
 function buildDeposits(canvas) {
   const balAct  = monthly.map(d => d.isA ? d.depBal : null);
   const balBgt  = monthly.map(d => d.depBal_b);
   const costAct = monthly.map(d => d.isA ? d.depCost : null);
   const costBgt = monthly.map(d => d.depCost_b);
   const barColors = monthly.map(d => d.isA ? COL.actual + 'b3' : 'transparent');
+
+  const balAll = [...balBgt, ...balAct.filter(v => v != null)];
+  const balMax = Math.max(...balAll) * 1.05;
+  const balMin = Math.min(...balAll) * 0.95;
+  const costAll = [...costBgt, ...costAct.filter(v => v != null)];
+  const costMax = Math.max(...costAll) + 0.08;
+  const costMin = Math.min(...costAll) - 0.08;
 
   return new Chart(canvas, {
     type: 'bar',
@@ -227,8 +253,8 @@ function buildDeposits(canvas) {
     },
     options: {
       scales: {
-        y:  { min: 3700, max: 4300, position: 'left',  grid: { color: '#eee', drawBorder: false }, ticks: { callback: v => (v/1000).toFixed(1) + 'B' } },
-        y1: { min: 3.2,  max: 3.6,  position: 'right', grid: { display: false },                    ticks: { callback: v => v + '%', color: COL.red } },
+        y:  { min: balMin, max: balMax, position: 'left',  grid: { color: '#eee', drawBorder: false }, ticks: { callback: v => (v/1000).toFixed(1) + 'B' } },
+        y1: { min: costMin, max: costMax, position: 'right', grid: { display: false }, ticks: { callback: v => v.toFixed(2) + '%', color: COL.red } },
         x:  { grid: { display: false } }
       }
     }
@@ -245,23 +271,38 @@ function buildCommBS(canvas) {
   const spdBgt = monthly.map(d => d.commSpd_b);
   const barColors = monthly.map(d => d.isA ? COL.actual + '99' : 'transparent');
 
+  const balAll = [...balBgt, ...balAct.filter(v => v != null)];
+  const balMax = Math.max(...balAll) * 1.10;
+  const balMin = Math.max(0, Math.min(...balAll) * 0.85);
+
+  // At officer level, spread can be near-zero; pick a reasonable rate range
+  const rateVals = [...yldBgt, ...yldAct.filter(v => v != null), ...spdBgt, ...spdAct.filter(v => v != null)];
+  const rateMax = Math.max(...rateVals) + 0.5;
+  const rateMin = Math.max(0, Math.min(...rateVals) - 0.5);
+
+  // Hide spread series if depCost is zero (officer level)
+  const hasSpread = Math.abs(sum(actM, 'depCost')) > 0.001;
+
+  const datasets = [
+    { label: 'Avg Bal',        data: balAct, backgroundColor: barColors, borderRadius: 3, barPercentage: 0.45, yAxisID: 'y',  order: 5 },
+    { label: 'Bal Budget',     data: balBgt, type: 'line', borderColor: COL.budget,     borderWidth: 2,   borderDash: [6,3], pointRadius: 0, fill: false, yAxisID: 'y',  order: 4 },
+    { label: 'Yield',          data: yldAct, type: 'line', borderColor: COL.teal,       borderWidth: 2.5,                       pointRadius: 4, pointBackgroundColor: COL.teal,   fill: false, yAxisID: 'y1', spanGaps: false, order: 0 },
+    { label: 'Yield Budget',   data: yldBgt, type: 'line', borderColor: COL.teal+'66',  borderWidth: 1.5, borderDash: [4,3], pointRadius: 0, fill: false, yAxisID: 'y1', order: 1 },
+  ];
+  if (hasSpread) {
+    datasets.push(
+      { label: 'Spread',         data: spdAct, type: 'line', borderColor: COL.purple,     borderWidth: 2.5,                       pointRadius: 4, pointBackgroundColor: COL.purple, fill: false, yAxisID: 'y1', spanGaps: false, order: 2 },
+      { label: 'Spread Budget',  data: spdBgt, type: 'line', borderColor: COL.purple+'66',borderWidth: 1.5, borderDash: [4,3], pointRadius: 0, fill: false, yAxisID: 'y1', order: 3 },
+    );
+  }
+
   return new Chart(canvas, {
     type: 'bar',
-    data: {
-      labels: MONTHS,
-      datasets: [
-        { label: 'Avg Bal',        data: balAct, backgroundColor: barColors, borderRadius: 3, barPercentage: 0.45, yAxisID: 'y',  order: 5 },
-        { label: 'Bal Budget',     data: balBgt, type: 'line', borderColor: COL.budget,     borderWidth: 2,   borderDash: [6,3], pointRadius: 0, fill: false, yAxisID: 'y',  order: 4 },
-        { label: 'Yield',          data: yldAct, type: 'line', borderColor: COL.teal,       borderWidth: 2.5,                       pointRadius: 4, pointBackgroundColor: COL.teal,   fill: false, yAxisID: 'y1', spanGaps: false, order: 0 },
-        { label: 'Yield Budget',   data: yldBgt, type: 'line', borderColor: COL.teal+'66',  borderWidth: 1.5, borderDash: [4,3], pointRadius: 0, fill: false, yAxisID: 'y1', order: 1 },
-        { label: 'Spread',         data: spdAct, type: 'line', borderColor: COL.purple,     borderWidth: 2.5,                       pointRadius: 4, pointBackgroundColor: COL.purple, fill: false, yAxisID: 'y1', spanGaps: false, order: 2 },
-        { label: 'Spread Budget',  data: spdBgt, type: 'line', borderColor: COL.purple+'66',borderWidth: 1.5, borderDash: [4,3], pointRadius: 0, fill: false, yAxisID: 'y1', order: 3 },
-      ]
-    },
+    data: { labels: MONTHS, datasets },
     options: {
       scales: {
-        y:  { min: 2200, max: 2850, position: 'left',  grid: { color: '#eee', drawBorder: false } },
-        y1: { min: 3.2,  max: 7.8,  position: 'right', grid: { display: false }, ticks: { callback: v => v + '%', color: COL.teal } },
+        y:  { min: balMin, max: balMax, position: 'left',  grid: { color: '#eee', drawBorder: false } },
+        y1: { min: rateMin, max: rateMax, position: 'right', grid: { display: false }, ticks: { callback: v => v.toFixed(1) + '%', color: COL.teal } },
         x:  { grid: { display: false } }
       }
     }
@@ -277,6 +318,7 @@ function buildNIOI(canvas) {
     borderRadius: 0,
     barPercentage: 0.7,
   });
+  const ymax = Math.max(...monthly.map(d => d.tm + d.pc + d.me + d.sv + d.ot)) * 1.15;
   return new Chart(canvas, {
     type: 'bar',
     data: {
@@ -292,7 +334,7 @@ function buildNIOI(canvas) {
     options: {
       scales: {
         x: { stacked: true, grid: { display: false } },
-        y: { stacked: true, max: 3.5, grid: { color: '#eee', drawBorder: false } }
+        y: { stacked: true, max: ymax, grid: { color: '#eee', drawBorder: false } }
       }
     }
   });
@@ -300,6 +342,7 @@ function buildNIOI(canvas) {
 
 // ── ⑨ Revenue Mix (NII + NIOI) ───────────────────────────────────
 function buildRevMix(canvas) {
+  const ymax = Math.max(...monthly.map(d => Math.max(d.flNII + d.flNIOI, d.bRev))) * 1.15;
   return new Chart(canvas, {
     type: 'bar',
     data: {
@@ -313,7 +356,7 @@ function buildRevMix(canvas) {
     options: {
       scales: {
         x: { stacked: true, grid: { display: false } },
-        y: { stacked: true, max: 12, grid: { color: '#eee', drawBorder: false } }
+        y: { stacked: true, max: ymax, grid: { color: '#eee', drawBorder: false } }
       }
     }
   });
@@ -321,7 +364,7 @@ function buildRevMix(canvas) {
 
 // ── ⑩ Full Year Stack — YTD + Remaining ──────────────────────────
 function buildFYStack(canvas) {
-  const lines = [
+  const allLines = [
     { l: 'FL Revenue',    y: sum(actM,'flRev'),  r: sum(remM,'bRev') },
     { l: 'FL NII',        y: sum(actM,'flNII'),  r: sum(remM,'bNII') },
     { l: 'FL NIOI',       y: sum(actM,'flNIOI'), r: sum(remM,'bNIOI') },
@@ -329,6 +372,8 @@ function buildFYStack(canvas) {
     { l: 'Consumer II',   y: sum(actM,'consII'), r: sum(remM,'consII_b') },
     { l: 'Treasury Mgmt', y: sum(actM,'tm'),     r: sum(remM,'tm_b') },
   ];
+  const lines = allLines.filter(d => Math.abs(d.y) + Math.abs(d.r) > 0.001);
+
   return new Chart(canvas, {
     type: 'bar',
     data: {
@@ -347,4 +392,81 @@ function buildFYStack(canvas) {
       plugins: { vertLine: false }
     }
   });
+}
+
+// ── ⑪ Officer Ranking (market level only) ────────────────────────
+// Clickable bars → drilling into officer. Click handler attached in main.js
+// via the global `onOfficerClick` setter so this file stays presentation-only.
+let onOfficerClick = null;  // assigned by main.js before render
+
+function buildOfficerRanking(canvas) {
+  // Pull officers from current market from `scope` (read at call time)
+  const inMarket = officers.filter(o => o.market === scope.market);
+
+  // Compute YTD actual and budget for each officer using their precomputed raw
+  const rows = inMarket.map(o => {
+    const ytdAct = o.raw.commII_a.reduce((s, v) => s + v, 0) +
+                   o.raw.tm_a.reduce((s, v) => s + v, 0) +
+                   o.raw.pc_a.reduce((s, v) => s + v, 0);
+    const ytdBgt = o.raw.commII_b.slice(0, ACT).reduce((s, v) => s + v, 0) +
+                   o.raw.tm_b.slice(0, ACT).reduce((s, v) => s + v, 0) +
+                   o.raw.pc_b.slice(0, ACT).reduce((s, v) => s + v, 0);
+    return { ...o, ytdAct, ytdBgt, gap: ytdAct - ytdBgt, gapPct: ((ytdAct - ytdBgt) / ytdBgt) * 100 };
+  }).sort((a, b) => a.gap - b.gap);  // worst first
+
+  const ch = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => `${r.name}  ·  ${r.tenure}yr`),
+      datasets: [
+        {
+          label: 'YTD Actual',
+          data: rows.map(r => r.ytdAct),
+          backgroundColor: rows.map(r => r.gap >= 0 ? COL.green + 'cc' : COL.red + 'cc'),
+          borderRadius: 4, barPercentage: 0.7,
+        },
+        {
+          label: 'YTD Budget',
+          data: rows.map(r => r.ytdBgt),
+          backgroundColor: COL.budget + '40',
+          borderRadius: 4, barPercentage: 0.7,
+        }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      onClick: (e, els) => {
+        if (els.length && onOfficerClick) {
+          onOfficerClick(rows[els[0].index].id);
+        }
+      },
+      onHover: (e, els) => {
+        e.native.target.style.cursor = els.length ? 'pointer' : 'default';
+      },
+      scales: {
+        x: { grid: { color: '#eee', drawBorder: false }, ticks: { callback: v => '$' + v.toFixed(1) + 'M' } },
+        y: { grid: { display: false }, ticks: { font: { weight: 600, size: 11 } } }
+      },
+      plugins: {
+        vertLine: false,
+        tooltip: {
+          callbacks: {
+            afterLabel: (ctx) => {
+              if (ctx.datasetIndex === 0) {
+                const r = rows[ctx.dataIndex];
+                return [
+                  `Budget: $${r.ytdBgt.toFixed(2)}M`,
+                  `Variance: ${r.gap >= 0 ? '+' : ''}${r.gap.toFixed(2)}M (${r.gapPct.toFixed(1)}%)`,
+                  '',
+                  'Click to drill into officer →'
+                ];
+              }
+              return null;
+            }
+          }
+        }
+      }
+    }
+  });
+  return ch;
 }

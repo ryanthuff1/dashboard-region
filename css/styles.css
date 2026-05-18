@@ -9,7 +9,7 @@ body {
 .wrap { max-width: 1140px; margin: 0 auto; padding: 24px 20px; }
 
 /* ── Header ──────────────────────────────────────────────────────── */
-.header { border-bottom: 2px solid #212529; padding-bottom: 14px; margin-bottom: 18px; }
+.header { border-bottom: 2px solid #212529; padding-bottom: 14px; margin-bottom: 14px; }
 .header h1 { font-size: 20px; font-weight: 800; display: inline; margin-right: 10px; }
 
 .badge {
@@ -23,7 +23,42 @@ body {
 .kpi-label { font-size: 9px; color: #78716c; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
 .kpi-val { font-size: 16px; font-weight: 800; }
 
-/* ── Nav ─────────────────────────────────────────────────────────── */
+/* ── Drill row (breadcrumb + sibling buttons) ────────────────────── */
+.drill {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin-bottom: 14px; padding: 8px 12px;
+  background: #fff; border: 1px solid #dee2e6; border-radius: 6px;
+  font-family: 'SF Mono', Consolas, monospace; font-size: 11px;
+}
+
+/* Breadcrumb segments — bigger, bolder than child buttons */
+.drill .crumb {
+  background: transparent; color: #1864ab;
+  border: none;
+  padding: 3px 6px; font-size: 12px; font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+.drill .crumb:hover:not(:disabled) { background: #e7f5ff; }
+.drill .crumb.active { color: #212529; cursor: default; }
+.drill .crumb-sep { color: #adb5bd; font-size: 14px; margin: 0 2px; }
+
+.drill .drill-divider { color: #dee2e6; margin: 0 6px; font-size: 14px; }
+
+/* Sibling/child drill-down buttons — smaller, neutral */
+.drill .child {
+  background: transparent; color: #495057;
+  border: 1px solid #dee2e6; border-radius: 4px;
+  padding: 3px 9px; font-size: 11px; font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.drill .child:hover { background: #e7f5ff; border-color: #1864ab; color: #1864ab; }
+
+/* ── Chart nav ───────────────────────────────────────────────────── */
 .nav { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 16px; }
 .nav button {
   background: transparent; color: #78716c;
