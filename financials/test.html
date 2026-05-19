@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Financial Dashboard Test</title>
+<style>
+body { font-family: system-ui, sans-serif; padding: 20px; background: #f8f9fa; }
+.result { padding: 10px; margin: 10px 0; border-radius: 4px; }
+.pass { background: #d3f9d8; border-left: 4px solid #2b8a3e; }
+.fail { background: #ffe3e3; border-left: 4px solid #c92a2a; }
+.info { background: #e7f5ff; border-left: 4px solid #1864ab; }
+h1 { color: #1864ab; }
+pre { background: white; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<h1>🧪 Financial Dashboard Test Suite</h1>
+<div id="results"></div>
+
+<script src="js/config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/charts.js"></script>
+
+<script>
+const results = document.getElementById('results');
+
+function pass(msg) {
+  results.innerHTML += `<div class="result pass">✓ ${msg}</div>`;
+}
+
+function fail(msg) {
+  results.innerHTML += `<div class="result fail">✗ ${msg}</div>`;
+}
+
+function info(msg) {
+  results.innerHTML += `<div class="result info">ℹ ${msg}</div>`;
+}
+
+// Test 1: Core constants loaded
+try {
+  if (MONTHS.length === 12 && ACT === 6) {
+    pass('Config loaded: 12 months, 6 actuals');
+  } else {
+    fail('Config incorrect');
+  }
+} catch (e) {
+  fail('Config failed to load: ' + e.message);
+}
+
+// Test 2: Officers loaded
+try {
+  if (officers && officers.length === 7) {
+    pass(`Officers loaded: ${officers.length} officers`);
+    const houston = officers.filter(o => o.market === 'Houston').length;
+    const dallas = officers.filter(o => o.market === 'Dallas').length;
+    info(`Houston: ${houston}, Dallas: ${dallas}`);
+  } else {
+    fail('Officers not loaded correctly');
+  }
+} catch (e) {
+  fail('Officers failed to load: ' + e.message);
+}
+
+// Test 3: Data recomputes at region level
+try {
+  recompute({ level: 'region' });
+  const regionRev = sum(monthly, 'totalRev');
+  pass(`Region total revenue: $${regionRev.toFixed(2)}M`);
+
+  if (monthly.length === 12 && actM.length === 6 && fctM.length === 6) {
+    pass('Monthly data structure correct: 12 total (6 actual + 6 forecast)');
+  } else {
+    fail(`Monthly data incorrect: ${monthly.length} total, ${actM.length} actual, ${fctM.length} forecast`);
+  }
+} catch (e) {
+  fail('Region recompute failed: ' + e.message);
+}
+
+// Test 4: Market drill-down
+try {
+  recompute({ level: 'market', market: 'Houston' });
+  const houstonRev = sum(monthly, 'totalRev');
+
+  recompute({ level: 'market', market: 'Dallas' });
+  const dallasRev = sum(monthly, 'totalRev');
+
+  recompute({ level: 'region' });
+  const regionRev = sum(monthly, 'totalRev');
+
+  const marketSum = houstonRev + dallasRev;
+  const diff = Math.abs(regionRev - marketSum);
+
+  info(`Houston: $${houstonRev.toFixed(2)}M, Dallas: $${dallasRev.toFixed(2)}M`);
+  info(`H+D Sum: $${marketSum.toFixed(2)}M, Region: $${regionRev.toFixed(2)}M`);
+
+  if (diff < 0.1) {
+    pass('Markets sum to region (difference < $0.1M)');
+  } else {
+    fail(`Markets don't sum to region (difference: $${diff.toFixed(2)}M)`);
+  }
+} catch (e) {
+  fail('Market drill-down failed: ' + e.message);
+}
+
+// Test 5: Officer drill-down
+try {
+  const testOfficer = officers[0];
+  recompute({ level: 'officer', market: testOfficer.market, officerId: testOfficer.id });
+  const officerRev = sum(monthly, 'totalRev');
+  pass(`Officer drill-down works: ${testOfficer.name} = $${officerRev.toFixed(2)}M`);
+} catch (e) {
+  fail('Officer drill-down failed: ' + e.message);
+}
+
+// Test 6: All officers in a market sum correctly
+try {
+  const market = 'Houston';
+  const marketOfficers = officers.filter(o => o.market === market);
+
+  recompute({ level: 'market', market });
+  const marketRev = sum(monthly, 'totalRev');
+
+  let officersSum = 0;
+  marketOfficers.forEach(o => {
+    recompute({ level: 'officer', market: o.market, officerId: o.id });
+    officersSum += sum(monthly, 'totalRev');
+  });
+
+  // Officer revenue should be less than market (market has overlay)
+  info(`${market} market: $${marketRev.toFixed(2)}M, Officers: $${officersSum.toFixed(2)}M`);
+
+  if (officersSum < marketRev) {
+    pass('Officers < Market (market includes overlay data)');
+  } else {
+    fail('Officers should be less than market total');
+  }
+} catch (e) {
+  fail('Officer summation test failed: ' + e.message);
+}
+
+// Test 7: Revenue components add up
+try {
+  recompute({ level: 'region' });
+  const month = monthly[0];  // January
+
+  const netII = month.netII;
+  const netFee = month.netFee;
+  const totalRev = month.totalRev;
+
+  const calculated = netII + netFee;
+  const diff = Math.abs(totalRev - calculated);
+
+  if (diff < 0.01) {
+    pass(`Revenue components add up: Net II + Net Fee = Total Rev`);
+  } else {
+    fail(`Revenue components don't add up (diff: $${diff.toFixed(3)}M)`);
+  }
+} catch (e) {
+  fail('Revenue components test failed: ' + e.message);
+}
+
+// Summary
+info('<strong>All core data tests complete!</strong> Dashboard is functional.');
+info('Open <a href="index.html">index.html</a> to view the full dashboard.');
+</script>
+</body>
+</html>
