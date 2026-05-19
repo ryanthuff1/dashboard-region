@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════
-// DATA — Financial performance metrics for South Central Region
+// DATA — Financial performance metrics for West Region
 //
 // Hierarchy: Region → Market (Houston/Dallas) → Officer
 //

@@ -30,7 +30,7 @@ const cards = [
 
 // ── Scope label helpers ────────────────────────────────────────
 function scopeTitle() {
-  if (currentScope.level === 'region') return 'South Central Region — Financial Performance';
+  if (currentScope.level === 'region') return 'West Region — Financial Performance';
   if (currentScope.level === 'market') return `${currentScope.market} Market — Financial Performance`;
   const o = officers.find(x => x.id === currentScope.officerId);
   return o ? `${o.name} · ${o.market} — Financial Performance` : 'Officer Performance';

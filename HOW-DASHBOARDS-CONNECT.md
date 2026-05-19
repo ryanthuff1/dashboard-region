@@ -63,7 +63,7 @@ Coverage Ratio:                 0.80x   ← Only 80% of what's needed!
 
 ### Step 1: Financial Dashboard Identifies the Gap
 
-**South Central Region Financial Performance:**
+**West Region Financial Performance:**
 - **Actuals through June**: Behind plan ~2-3% in Q1, recovering in Q2
 - **Officers performing mixed**:
   - D. Patel (adj 1.05): 5% ahead of plan ✅
@@ -75,7 +75,7 @@ Coverage Ratio:                 0.80x   ← Only 80% of what's needed!
 
 ### Step 2: Pipeline Dashboard Shows if Gap Can Be Closed
 
-**West Region Pipeline** (note: synthetic data shows "West" but represents same officers):
+**West Region Pipeline:
 - **67 active pipeline deals** across same 7 officers
 - **Weighted pipeline revenue**: $3.04M
 - **Coverage of $3.8M gap**: 0.80x 🔴
