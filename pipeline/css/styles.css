@@ -23,6 +23,16 @@ body {
   padding: 3px 10px; border-radius: 4px;
   font-family: 'SF Mono', Consolas, monospace; vertical-align: middle;
 }
+.template-link {
+  font-size: 10px; font-weight: 700; color: #1864ab;
+  background: #e7f5ff; border: 1px solid #a5d8ff;
+  padding: 3px 10px; border-radius: 4px;
+  font-family: 'SF Mono', Consolas, monospace;
+  text-decoration: none; margin-left: 8px;
+  vertical-align: middle;
+  transition: all 0.15s;
+}
+.template-link:hover { background: #1864ab; color: #fff; border-color: #1864ab; }
 
 .kpi-strip { display: flex; gap: 20px; margin-top: 14px; font-family: 'SF Mono', Consolas, monospace; flex-wrap: wrap; }
 .kpi { text-align: center; min-width: 90px; }
