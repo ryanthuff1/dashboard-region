@@ -1,0 +1,306 @@
+// ════════════════════════════════════════════════════════════════
+// DAX MEASURES — Pipeline Dashboard Metrics
+// ════════════════════════════════════════════════════════════════
+//
+// Create these measures in Power BI Desktop:
+// 1. Go to Modeling tab → New Measure
+// 2. Copy each measure below (including the name and formula)
+// 3. Paste into the formula bar
+// 4. Format the measure as indicated in comments
+//
+// ════════════════════════════════════════════════════════════════
+
+
+// ──────────────────────────────────────────────────────────────
+// BASIC COUNTS
+// ──────────────────────────────────────────────────────────────
+
+// Total number of open deals (exclude Closed)
+Open Deals =
+CALCULATE(
+    COUNTROWS('Deals'),
+    'Deals'[IsOpen] = TRUE
+)
+// Format: Whole Number
+
+
+// Total number of closed deals
+Closed Deals =
+CALCULATE(
+    COUNTROWS('Deals'),
+    'Deals'[IsClosed] = TRUE
+)
+// Format: Whole Number
+
+
+// Total number of all deals
+Total Deals = COUNTROWS('Deals')
+// Format: Whole Number
+
+
+// ──────────────────────────────────────────────────────────────
+// PIPELINE VALUE METRICS
+// ──────────────────────────────────────────────────────────────
+
+// Total balance of open deals (loan amounts, deposit balances)
+Total Balance =
+CALCULATE(
+    SUM('Deals'[Amount]),
+    'Deals'[IsOpen] = TRUE
+)
+// Format: Currency, $ English (United States), 0 decimals
+
+
+// Total annual revenue potential (open deals only)
+Total Annual Rev =
+CALCULATE(
+    SUM('Deals'[AnnualRev]),
+    'Deals'[IsOpen] = TRUE
+)
+// Format: Currency, $ English (United States), 0 decimals
+
+
+// Weighted annual revenue (probability-adjusted)
+Weighted Rev =
+CALCULATE(
+    SUM('Deals'[WeightedRev]),
+    'Deals'[IsOpen] = TRUE
+)
+// Format: Currency, $ English (United States), 0 decimals
+
+
+// Closed YTD revenue (from deals marked Closed)
+Closed YTD Rev =
+CALCULATE(
+    SUM('Deals'[AnnualRev]),
+    'Deals'[IsClosed] = TRUE
+)
+// Format: Currency, $ English (United States), 0 decimals
+
+
+// ──────────────────────────────────────────────────────────────
+// COVERAGE METRICS
+// ──────────────────────────────────────────────────────────────
+
+// Revenue gap to close (hardcoded from config — $3.8M region-wide)
+// In a real scenario, this would come from a Budget table
+Revenue Gap = 3800000
+// Format: Currency, $ English (United States), 0 decimals
+
+
+// Pipeline coverage ratio (Weighted Rev ÷ Revenue Gap)
+Coverage Ratio =
+DIVIDE(
+    [Weighted Rev],
+    [Revenue Gap],
+    0
+)
+// Format: Decimal Number, 1 decimal place
+// OR create a separate measure for display:
+
+Coverage Ratio Text =
+FORMAT([Coverage Ratio], "0.0") & "x"
+// Format: Text
+
+
+// Coverage status (colors for conditional formatting)
+Coverage Status =
+SWITCH(
+    TRUE(),
+    [Coverage Ratio] >= 3.0, "Healthy (≥3.0x)",
+    [Coverage Ratio] >= 1.5, "Warning (1.5-3.0x)",
+    "Critical (<1.5x)"
+)
+// Format: Text
+
+
+// ──────────────────────────────────────────────────────────────
+// AVERAGE METRICS
+// ──────────────────────────────────────────────────────────────
+
+// Average days in stage (open deals only)
+Avg Days in Stage =
+CALCULATE(
+    AVERAGE('Deals'[DaysInStage]),
+    'Deals'[IsOpen] = TRUE
+)
+// Format: Whole Number
+
+
+// Average deal size (open deals)
+Avg Deal Size =
+CALCULATE(
+    AVERAGE('Deals'[Amount]),
+    'Deals'[IsOpen] = TRUE
+)
+// Format: Currency, $ English (United States), 0 decimals
+
+
+// Average probability (open deals)
+Avg Probability =
+CALCULATE(
+    AVERAGE('Deals'[Probability]),
+    'Deals'[IsOpen] = TRUE
+)
+// Format: Percentage, 0 decimals
+
+
+// ──────────────────────────────────────────────────────────────
+// BY STAGE METRICS (for funnel chart)
+// ──────────────────────────────────────────────────────────────
+
+// Count by stage (automatically filtered by visual)
+Deals by Stage =
+CALCULATE(
+    COUNTROWS('Deals'),
+    'Deals'[IsOpen] = TRUE
+)
+// Use in visual with Stage on axis
+
+
+// Weighted revenue by stage
+Weighted Rev by Stage =
+CALCULATE(
+    SUM('Deals'[WeightedRev]),
+    'Deals'[IsOpen] = TRUE
+)
+// Use in visual with Stage on axis
+
+
+// ──────────────────────────────────────────────────────────────
+// BY PRODUCT METRICS
+// ──────────────────────────────────────────────────────────────
+
+// Open deals by product
+Open Deals by Product =
+CALCULATE(
+    COUNTROWS('Deals'),
+    'Deals'[IsOpen] = TRUE
+)
+// Use in visual with Product on axis
+
+
+// Balance by product
+Balance by Product =
+CALCULATE(
+    SUM('Deals'[Amount]),
+    'Deals'[IsOpen] = TRUE
+)
+
+
+// ──────────────────────────────────────────────────────────────
+// AGING METRICS
+// ──────────────────────────────────────────────────────────────
+
+// Count of deals in "stuck" category (>90 days)
+Stuck Deals =
+CALCULATE(
+    COUNTROWS('Deals'),
+    'Deals'[IsOpen] = TRUE,
+    'Deals'[AgingBucket] = "90+ days"
+)
+// Format: Whole Number
+
+
+// Percentage of deals that are stuck
+Stuck % =
+DIVIDE(
+    [Stuck Deals],
+    [Open Deals],
+    0
+)
+// Format: Percentage, 0 decimals
+
+
+// Weighted revenue at risk (deals >90 days)
+At Risk Rev =
+CALCULATE(
+    SUM('Deals'[WeightedRev]),
+    'Deals'[IsOpen] = TRUE,
+    'Deals'[AgingBucket] = "90+ days"
+)
+// Format: Currency
+
+
+// ──────────────────────────────────────────────────────────────
+// TOP PERFORMERS (for ranking)
+// ──────────────────────────────────────────────────────────────
+
+// RM Rank by weighted revenue (lower number = better)
+RM Rank =
+RANKX(
+    ALL('Deals'[RM]),
+    [Weighted Rev],
+    ,
+    DESC,
+    DENSE
+)
+// Format: Whole Number
+
+
+// ──────────────────────────────────────────────────────────────
+// KPI INDICATORS (for card visuals)
+// ──────────────────────────────────────────────────────────────
+
+// Total pipeline value (formatted for card)
+Pipeline Value Card =
+"$" & FORMAT([Total Annual Rev] / 1000000, "0.0") & "M"
+// Format: Text
+
+
+// Weighted pipeline value (formatted for card)
+Weighted Value Card =
+"$" & FORMAT([Weighted Rev] / 1000000, "0.0") & "M"
+// Format: Text
+
+
+// Coverage ratio (formatted for card)
+Coverage Card =
+FORMAT([Coverage Ratio], "0.0") & "x coverage"
+// Format: Text
+
+
+// ──────────────────────────────────────────────────────────────
+// TIME INTELLIGENCE (for expected close trends)
+// ──────────────────────────────────────────────────────────────
+
+// Expected revenue by month
+Expected Rev by Month =
+CALCULATE(
+    SUM('Deals'[WeightedRev]),
+    'Deals'[IsOpen] = TRUE
+)
+// Use in visual with ExpectedCloseYearMonth on axis
+
+
+// Deal count expected to close by month
+Expected Closes by Month =
+CALCULATE(
+    COUNTROWS('Deals'),
+    'Deals'[IsOpen] = TRUE
+)
+// Use in visual with ExpectedCloseYearMonth on axis
+
+
+// ──────────────────────────────────────────────────────────────
+// CONDITIONAL FORMATTING HELPERS
+// ──────────────────────────────────────────────────────────────
+
+// Color for coverage ratio
+Coverage Color =
+SWITCH(
+    TRUE(),
+    [Coverage Ratio] >= 3.0, "#2b8a3e",      // Green
+    [Coverage Ratio] >= 1.5, "#e67700",      // Amber
+    "#c92a2a"                                 // Red
+)
+
+
+// Color for aging
+Aging Color =
+SWITCH(
+    TRUE(),
+    MAX('Deals'[DaysInStage]) >= 90, "#c92a2a",     // Red
+    MAX('Deals'[DaysInStage]) >= 61, "#e67700",     // Amber
+    "#2b8a3e"                                        // Green
+)

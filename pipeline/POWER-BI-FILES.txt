@@ -1,0 +1,243 @@
+════════════════════════════════════════════════════════════════════════
+POWER BI DASHBOARD FILES — COMPLETE PACKAGE
+════════════════════════════════════════════════════════════════════════
+
+This package contains everything you need to recreate the RM Pipeline
+dashboards in Microsoft Power BI Desktop.
+
+────────────────────────────────────────────────────────────────────────
+📁 FILES INCLUDED (9 files, 104 KB total)
+────────────────────────────────────────────────────────────────────────
+
+START HERE:
+  README-PowerBI.md (7 KB)          Quick start guide and overview
+
+SETUP GUIDES:
+  PowerBI-Setup-Guide.md (24 KB)    Complete visual specifications
+  DataModel-Setup.md (12 KB)        Star schema with hierarchies setup
+
+POWER QUERY M CODE:
+  PowerQuery-LoadWorkbook.m (9 KB)       Simple single-table approach
+  PowerQuery-WithDimensions.m (8 KB)     Fact table for star schema ⭐
+  PowerQuery-DimTables.m (13 KB)         6 dimension tables ⭐
+
+DAX MEASURES:
+  DAX-Measures.txt (11 KB)               30+ basic measures
+  DAX-HierarchyMeasures.txt (17 KB)      50+ hierarchy-aware measures ⭐
+
+THEME:
+  pipeline-theme.json (4 KB)             Color theme matching web dashboards
+
+────────────────────────────────────────────────────────────────────────
+🚀 QUICK START (2 Options)
+────────────────────────────────────────────────────────────────────────
+
+OPTION 1: Simple Single-Table (30 minutes)
+  1. Open Power BI Desktop
+  2. Get Data → Blank Query
+  3. Paste PowerQuery-LoadWorkbook.m (update file path line 22)
+  4. Create measures from DAX-Measures.txt
+  5. Build visuals per PowerBI-Setup-Guide.md
+  
+OPTION 2: Star Schema with Hierarchies (90 minutes) ⭐ RECOMMENDED
+  1. Follow DataModel-Setup.md step-by-step
+  2. Load fact table (PowerQuery-WithDimensions.m)
+  3. Load 6 dimensions (PowerQuery-DimTables.m)
+  4. Create relationships and hierarchies
+  5. Create measures from DAX-HierarchyMeasures.txt
+  6. Build visuals with drill-down capability
+
+────────────────────────────────────────────────────────────────────────
+⭐ WHY USE STAR SCHEMA? (Option 2)
+────────────────────────────────────────────────────────────────────────
+
+✅ DRILL-DOWN: Region → Market → RM (3 levels)
+✅ TIME INTELLIGENCE: YTD, QTD, MTD calculations
+✅ BETTER PERFORMANCE: Optimized for large datasets
+✅ CLEANER MODEL: Reusable dimension tables
+✅ EASIER FILTERING: FunnelPhase, ProductCategory, RiskLevel
+✅ PROFESSIONAL: Industry best practice for BI
+
+────────────────────────────────────────────────────────────────────────
+📊 WHAT YOU'LL BUILD
+────────────────────────────────────────────────────────────────────────
+
+REGIONAL DASHBOARD (Market-level view)
+  • KPI cards (Open Deals, Weighted Revenue, Coverage Ratio)
+  • Pipeline by Market (bar chart)
+  • Pipeline by Stage (funnel chart)
+  • Top 10 RMs by Weighted Revenue
+  • Aging Distribution (stuck deal analysis)
+  • Product Mix (donut chart)
+  • Market Comparison Table
+  • Expected Close Trend (time series)
+
+PIPELINE DASHBOARD (Individual RM view)
+  • RM-specific KPIs with rank
+  • RM Stage Funnel
+  • Top 10 Deals table with conditional formatting
+  • Deal Aging Distribution
+  • Product Mix for RM
+  • Expected Close Timeline
+  • Detailed Deal List (all deals, scrollable)
+
+────────────────────────────────────────────────────────────────────────
+🎯 DATA MODEL ARCHITECTURE
+────────────────────────────────────────────────────────────────────────
+
+STAR SCHEMA (Option 2):
+
+              ┌─────────────┐
+              │ DimCalendar │ (Year → Quarter → Month → Date)
+              └──────┬──────┘
+                     │
+        ┌────────────┼────────────┐
+        │            │            │
+  ┌─────▼────┐  ┌───▼────┐  ┌───▼─────┐
+  │  DimRM   │  │ DEALS  │  │DimStage │
+  │  (Org    │◄─┤ (FACT) │─►│(Funnel) │
+  │Hierarchy)│  └───┬────┘  └─────────┘
+  └──────────┘      │
+       ┌────────────┼────────────┐
+       │            │            │
+  ┌────▼───┐  ┌────▼────┐  ┌────▼────┐
+  │DimGeo  │  │DimProd  │  │DimAging │
+  └────────┘  └─────────┘  └─────────┘
+
+HIERARCHIES:
+  1. Organization: Region → Market → RM
+  2. Geography: Region → Market
+  3. Product: Category → Product
+  4. Sales Funnel: Phase → Stage
+  5. Calendar: Year → Quarter → Month → Date
+
+────────────────────────────────────────────────────────────────────────
+🎨 COLOR PALETTE
+────────────────────────────────────────────────────────────────────────
+
+Primary Blue    #1864AB    Main data bars, KPIs
+Gray            #ADB5BD    Budget/target lines
+Green           #2B8A3E    Positive indicators, Commit stage
+Red             #C92A2A    Alerts, stuck deals
+Amber           #E67700    Warnings, aging 61-90 days
+Purple          #7048E8    Deposits product
+Teal            #0C8599    Treasury Mgmt, Proposal stage
+
+Apply theme: View → Themes → Browse → Select pipeline-theme.json
+
+────────────────────────────────────────────────────────────────────────
+📈 KEY MEASURES (Examples)
+────────────────────────────────────────────────────────────────────────
+
+BASIC:
+  [Open Deals]           Count of non-closed deals
+  [Weighted Rev]         Probability-adjusted revenue
+  [Coverage Ratio]       Weighted Rev ÷ Revenue Gap
+  [Avg Days in Stage]    Average aging of open deals
+  [Stuck Deals]          Count of deals >90 days
+
+HIERARCHY-AWARE:
+  [Current Level]        Detects if viewing Region/Market/RM
+  [Rank in Parent]       RM rank within market
+  [% of Parent Total]    Contribution to parent level
+  [Parent Level Avg]     Compare to market/region average
+  [Pipeline Health]      Score based on stage distribution
+
+────────────────────────────────────────────────────────────────────────
+✅ SETUP CHECKLIST
+────────────────────────────────────────────────────────────────────────
+
+STAR SCHEMA MODEL (Recommended):
+  ☐ Load Deals fact table
+  ☐ Load 6 dimension tables
+  ☐ Create 6 relationships (all Many-to-One)
+  ☐ Mark DimCalendar as date table
+  ☐ Create 5 hierarchies
+  ☐ Set sort orders (Stage by StageOrder, etc.)
+  ☐ Hide technical key columns
+  ☐ Create 50+ DAX measures
+  ☐ Apply color theme
+  ☐ Build Regional dashboard (8 visuals)
+  ☐ Build Pipeline dashboard (8 visuals)
+  ☐ Test drill-down at all levels
+
+────────────────────────────────────────────────────────────────────────
+🔧 REQUIREMENTS
+────────────────────────────────────────────────────────────────────────
+
+Software:
+  • Power BI Desktop (free download from Microsoft)
+  • Windows 10/11 or Windows Server
+
+Files:
+  • RM-pipeline-workbook.xlsx (Excel file with deal data)
+  • All .m, .txt, .md, and .json files from this package
+
+Skills:
+  • Basic Power BI knowledge (helpful but not required)
+  • Following step-by-step instructions
+
+Time:
+  • Simple setup: 30 minutes
+  • Star schema setup: 90 minutes
+
+────────────────────────────────────────────────────────────────────────
+📚 FILE READING ORDER
+────────────────────────────────────────────────────────────────────────
+
+1. README-PowerBI.md           (Start here, 5 min read)
+2. DataModel-Setup.md           (If using star schema, 15 min read)
+3. PowerBI-Setup-Guide.md       (Visual specs, reference as needed)
+4. DAX-HierarchyMeasures.txt    (Copy measures, 20 min)
+
+────────────────────────────────────────────────────────────────────────
+💡 TIPS
+────────────────────────────────────────────────────────────────────────
+
+• Start with star schema (Option 2) — you'll be glad you did
+• Use Ctrl+F to search for specific visuals in the guides
+• Test each measure after creating it (add to a card visual)
+• Save often while building visuals
+• Enable drill-down icons in visual headers for better UX
+• Use slicers for interactivity (Market, Product, Stage, RM)
+• Publish to Power BI Service for sharing with team
+
+────────────────────────────────────────────────────────────────────────
+🆘 TROUBLESHOOTING
+────────────────────────────────────────────────────────────────────────
+
+"File not found" error
+  → Check file path in M code (must be absolute: C:/Users/...)
+
+Relationships won't create
+  → Verify column data types match (text to text, date to date)
+
+Measures show wrong values
+  → Use Deals table for calculations, not dimension tables
+
+Hierarchies don't work
+  → Set sort orders (Stage by StageOrder, Market by MarketOrder)
+
+Visuals are blank
+  → Check for IsOpen = TRUE filter on pipeline visuals
+
+────────────────────────────────────────────────────────────────────────
+🎉 WHAT'S INCLUDED
+────────────────────────────────────────────────────────────────────────
+
+✅ Full data model setup (single-table OR star schema)
+✅ 80+ ready-to-use DAX measures
+✅ Complete visual specifications for 16 charts/tables
+✅ Custom color theme matching web dashboards
+✅ Hierarchy setup for drill-down analysis
+✅ Conditional formatting rules
+✅ Step-by-step instructions with screenshots descriptions
+✅ Best practices and troubleshooting tips
+
+────────────────────────────────────────────────────────────────────────
+
+Created: 2026-05-19
+For: RM Pipeline Dashboards (Region: South Central, Markets: Houston/Dallas)
+Compatibility: Power BI Desktop (latest version recommended)
+
+════════════════════════════════════════════════════════════════════════

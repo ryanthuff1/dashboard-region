@@ -1,0 +1,553 @@
+// ════════════════════════════════════════════════════════════════
+// DAX MEASURES — Hierarchy-Aware Calculations
+// ════════════════════════════════════════════════════════════════
+//
+// These measures leverage the star schema model and work correctly
+// at ANY hierarchy level (Region → Market → RM, etc.)
+//
+// Prerequisites:
+// - Star schema model set up (see DataModel-Setup.md)
+// - All dimension tables and relationships created
+// - Hierarchies built in dimension tables
+//
+// ════════════════════════════════════════════════════════════════
+
+
+// ──────────────────────────────────────────────────────────────
+// BASIC MEASURES (work at any hierarchy level)
+// ──────────────────────────────────────────────────────────────
+
+Open Deals =
+CALCULATE(
+    COUNTROWS(Deals),
+    Deals[IsOpen] = TRUE
+)
+
+Total Annual Rev =
+CALCULATE(
+    SUM(Deals[AnnualRev]),
+    Deals[IsOpen] = TRUE
+)
+
+Weighted Rev =
+CALCULATE(
+    SUM(Deals[WeightedRev]),
+    Deals[IsOpen] = TRUE
+)
+
+Closed YTD Rev =
+CALCULATE(
+    SUM(Deals[AnnualRev]),
+    Deals[IsClosed] = TRUE
+)
+
+
+// ──────────────────────────────────────────────────────────────
+// HIERARCHY CONTEXT MEASURES
+// ──────────────────────────────────────────────────────────────
+
+// Detects current hierarchy level
+Current Level =
+SWITCH(
+    TRUE(),
+    NOT ISFILTERED(DimRM[RM]) && NOT ISFILTERED(DimRM[Market]), "Region",
+    NOT ISFILTERED(DimRM[RM]) && ISFILTERED(DimRM[Market]), "Market",
+    ISFILTERED(DimRM[RM]), "RM",
+    "All"
+)
+
+
+// Gets the name of the current context
+Current Level Name =
+SWITCH(
+    [Current Level],
+    "RM", SELECTEDVALUE(DimRM[RM], "Multiple RMs"),
+    "Market", SELECTEDVALUE(DimRM[Market], "Multiple Markets"),
+    "Region", SELECTEDVALUE(DimRM[Region], "All Regions"),
+    "Unknown"
+)
+
+
+// Count of entities at current level
+Entity Count =
+SWITCH(
+    [Current Level],
+    "RM", DISTINCTCOUNT(DimRM[RM]),
+    "Market", DISTINCTCOUNT(DimRM[Market]),
+    "Region", DISTINCTCOUNT(DimRM[Region]),
+    1
+)
+
+
+// ──────────────────────────────────────────────────────────────
+// PARENT LEVEL COMPARISONS
+// ──────────────────────────────────────────────────────────────
+
+// Average for the parent level (e.g., Market avg when looking at RM)
+Parent Level Avg =
+VAR CurrentLevelType = [Current Level]
+RETURN
+SWITCH(
+    CurrentLevelType,
+    "RM",
+        CALCULATE(
+            [Weighted Rev],
+            ALLEXCEPT(DimRM, DimRM[Market])
+        ) / CALCULATE(DISTINCTCOUNT(DimRM[RM]), ALLEXCEPT(DimRM, DimRM[Market])),
+    "Market",
+        CALCULATE(
+            [Weighted Rev],
+            ALLEXCEPT(DimRM, DimRM[Region])
+        ) / CALCULATE(DISTINCTCOUNT(DimRM[Market]), ALLEXCEPT(DimRM, DimRM[Region])),
+    BLANK()
+)
+
+
+// Variance from parent average
+Variance from Parent =
+[Weighted Rev] - [Parent Level Avg]
+
+
+// Percentage of parent total
+% of Parent Total =
+DIVIDE(
+    [Weighted Rev],
+    CALCULATE(
+        [Weighted Rev],
+        SWITCH(
+            [Current Level],
+            "RM", ALLEXCEPT(DimRM, DimRM[Market]),
+            "Market", ALLEXCEPT(DimRM, DimRM[Region]),
+            ALL(DimRM)
+        )
+    ),
+    0
+)
+// Format: Percentage
+
+
+// ──────────────────────────────────────────────────────────────
+// RANKING MEASURES (work within hierarchy context)
+// ──────────────────────────────────────────────────────────────
+
+// Rank within parent level
+Rank in Parent =
+VAR CurrentLevelType = [Current Level]
+RETURN
+SWITCH(
+    CurrentLevelType,
+    "RM",
+        RANKX(
+            ALLEXCEPT(DimRM, DimRM[Market]),
+            [Weighted Rev],
+            ,
+            DESC,
+            DENSE
+        ),
+    "Market",
+        RANKX(
+            ALLEXCEPT(DimRM, DimRM[Region]),
+            [Weighted Rev],
+            ,
+            DESC,
+            DENSE
+        ),
+    BLANK()
+)
+
+
+// Overall rank (across all RMs)
+Overall Rank =
+IF(
+    [Current Level] = "RM",
+    RANKX(
+        ALL(DimRM[RM]),
+        [Weighted Rev],
+        ,
+        DESC,
+        DENSE
+    ),
+    BLANK()
+)
+
+
+// Rank display with ordinal suffix
+Rank Display =
+VAR RankValue = [Rank in Parent]
+RETURN
+IF(
+    ISBLANK(RankValue),
+    "",
+    RankValue &
+    SWITCH(
+        TRUE(),
+        RankValue IN {11, 12, 13}, "th",
+        MOD(RankValue, 10) = 1, "st",
+        MOD(RankValue, 10) = 2, "nd",
+        MOD(RankValue, 10) = 3, "rd",
+        "th"
+    )
+)
+
+
+// ──────────────────────────────────────────────────────────────
+// PRODUCT MIX ANALYSIS (by hierarchy level)
+// ──────────────────────────────────────────────────────────────
+
+// % of pipeline from Comm Loan
+% Comm Loan =
+DIVIDE(
+    CALCULATE([Weighted Rev], DimProduct[Product] = "Comm Loan"),
+    [Weighted Rev],
+    0
+)
+// Format: Percentage
+
+
+// Product diversification score (1 = perfectly balanced, 0 = all in one)
+Product Diversification =
+VAR ProductCount = DISTINCTCOUNT(DimProduct[Product])
+VAR IdealShare = 1 / ProductCount
+VAR ActualShares =
+    ADDCOLUMNS(
+        VALUES(DimProduct[Product]),
+        "Share", DIVIDE([Weighted Rev], CALCULATE([Weighted Rev], ALL(DimProduct)), 0)
+    )
+VAR Variance =
+    SUMX(
+        ActualShares,
+        ABS([Share] - IdealShare)
+    )
+RETURN
+1 - (Variance / (2 * (ProductCount - 1) / ProductCount))
+// Format: Percentage, 0 decimals
+
+
+// ──────────────────────────────────────────────────────────────
+// STAGE DISTRIBUTION ANALYSIS
+// ──────────────────────────────────────────────────────────────
+
+// % of deals in early stage (Lead + Qualified)
+% Early Stage =
+DIVIDE(
+    CALCULATE([Open Deals], DimStage[FunnelPhase] = "Early"),
+    [Open Deals],
+    0
+)
+// Format: Percentage
+
+
+// % of weighted revenue in late stage (Commit)
+% Late Stage Rev =
+DIVIDE(
+    CALCULATE([Weighted Rev], DimStage[Stage] = "Commit"),
+    [Weighted Rev],
+    0
+)
+// Format: Percentage
+
+
+// Pipeline health score (higher late stage % = healthier)
+Pipeline Health =
+VAR EarlyRev = CALCULATE([Weighted Rev], DimStage[FunnelPhase] = "Early")
+VAR MidRev = CALCULATE([Weighted Rev], DimStage[FunnelPhase] = "Mid")
+VAR LateRev = CALCULATE([Weighted Rev], DimStage[FunnelPhase] = "Late")
+VAR TotalRev = [Weighted Rev]
+RETURN
+DIVIDE(
+    (EarlyRev * 0.3) + (MidRev * 0.5) + (LateRev * 1.0),
+    TotalRev,
+    0
+)
+// Format: Decimal, 2 places
+
+
+// ──────────────────────────────────────────────────────────────
+// AGING & RISK ANALYSIS
+// ──────────────────────────────────────────────────────────────
+
+// % of deals stuck (>90 days)
+% Stuck Deals =
+DIVIDE(
+    CALCULATE([Open Deals], DimAging[RiskLevel] = "At Risk"),
+    [Open Deals],
+    0
+)
+// Format: Percentage
+
+
+// Weighted revenue at risk
+At Risk Revenue =
+CALCULATE(
+    [Weighted Rev],
+    DimAging[RiskLevel] = "At Risk"
+)
+// Format: Currency
+
+
+// Risk-adjusted pipeline (discount stuck deals by 50%)
+Risk Adjusted Pipeline =
+VAR HealthyRev = CALCULATE([Weighted Rev], DimAging[RiskLevel] IN {"Healthy", "Normal"})
+VAR WarningRev = CALCULATE([Weighted Rev], DimAging[RiskLevel] = "Warning")
+VAR AtRiskRev = CALCULATE([Weighted Rev], DimAging[RiskLevel] = "At Risk")
+RETURN
+HealthyRev + (WarningRev * 0.75) + (AtRiskRev * 0.50)
+// Format: Currency
+
+
+// ──────────────────────────────────────────────────────────────
+// TIME INTELLIGENCE (using DimCalendar)
+// ──────────────────────────────────────────────────────────────
+
+// Pipeline expected to close this month
+Expected This Month =
+CALCULATE(
+    [Weighted Rev],
+    Deals[IsOpen] = TRUE,
+    DimCalendar[YearMonth] = FORMAT(TODAY(), "yyyy-MM")
+)
+// Format: Currency
+
+
+// Pipeline expected to close this quarter
+Expected This Quarter =
+CALCULATE(
+    [Weighted Rev],
+    Deals[IsOpen] = TRUE,
+    DimCalendar[YearQuarter] =
+        FORMAT(TODAY(), "yyyy") & " Q" & FORMAT(QUARTER(TODAY()), "0")
+)
+// Format: Currency
+
+
+// Pipeline expected to close in next 30 days
+Expected Next 30 Days =
+CALCULATE(
+    [Weighted Rev],
+    Deals[IsOpen] = TRUE,
+    Deals[ExpectedClose] >= TODAY(),
+    Deals[ExpectedClose] <= TODAY() + 30
+)
+// Format: Currency
+
+
+// Expected close trend (for line charts)
+Expected by Month =
+CALCULATE(
+    [Weighted Rev],
+    Deals[IsOpen] = TRUE
+)
+// Use with DimCalendar[YearMonth] on axis
+
+
+// ──────────────────────────────────────────────────────────────
+// COVERAGE & TARGETS
+// ──────────────────────────────────────────────────────────────
+
+// Revenue gap (this should ideally come from a Targets table)
+Revenue Gap =
+VAR RegionGap = 3800000  // $3.8M total for region
+VAR CurrentLevel = [Current Level]
+VAR CurrentRM = SELECTEDVALUE(DimRM[RM])
+VAR CurrentMarket = SELECTEDVALUE(DimRM[Market])
+RETURN
+SWITCH(
+    CurrentLevel,
+    "Region", RegionGap,
+    "Market",
+        // Split by market based on number of RMs
+        RegionGap * DIVIDE(
+            CALCULATE(DISTINCTCOUNT(DimRM[RM]), DimRM[Market] = CurrentMarket),
+            DISTINCTCOUNT(DimRM[RM])
+        ),
+    "RM",
+        // Split by RM share (1/7 for simplicity; real version would use targets table)
+        RegionGap / DISTINCTCOUNT(DimRM[RM]),
+    BLANK()
+)
+// Format: Currency
+
+
+// Coverage ratio
+Coverage Ratio =
+DIVIDE([Weighted Rev], [Revenue Gap], 0)
+// Format: Decimal, 1 place
+
+
+// Gap to close
+Gap to Close =
+[Revenue Gap] - [Weighted Rev]
+// Format: Currency
+
+
+// Coverage status
+Coverage Status =
+SWITCH(
+    TRUE(),
+    [Coverage Ratio] >= 3.0, "🟢 Healthy (≥3.0x)",
+    [Coverage Ratio] >= 1.5, "🟡 Warning (1.5-3.0x)",
+    "🔴 Critical (<1.5x)"
+)
+
+
+// ──────────────────────────────────────────────────────────────
+// PERFORMANCE METRICS
+// ──────────────────────────────────────────────────────────────
+
+// Average deal size
+Avg Deal Size =
+DIVIDE(
+    CALCULATE(SUM(Deals[Amount]), Deals[IsOpen] = TRUE),
+    [Open Deals],
+    0
+)
+// Format: Currency
+
+
+// Win rate (closed / all deals)
+Win Rate =
+VAR TotalDeals = COUNTROWS(Deals)
+VAR ClosedDeals = CALCULATE(COUNTROWS(Deals), Deals[IsClosed] = TRUE)
+RETURN
+DIVIDE(ClosedDeals, TotalDeals, 0)
+// Format: Percentage
+
+
+// Velocity score (lower days in stage = better)
+Velocity Score =
+VAR AvgDays = CALCULATE(AVERAGE(Deals[DaysInStage]), Deals[IsOpen] = TRUE)
+VAR BenchmarkDays = 45  // Target average
+RETURN
+1 - (AvgDays / (BenchmarkDays * 2))  // Score between 0 and 1
+// Format: Percentage
+
+
+// ──────────────────────────────────────────────────────────────
+// CONDITIONAL FORMATTING HELPERS
+// ──────────────────────────────────────────────────────────────
+
+// Color code for coverage ratio
+Coverage Color =
+SWITCH(
+    TRUE(),
+    [Coverage Ratio] >= 3.0, "#2B8A3E",    // Green
+    [Coverage Ratio] >= 1.5, "#E67700",    // Amber
+    "#C92A2A"                               // Red
+)
+
+
+// Color code for rank (1-3 = green, 4-5 = amber, 6+ = red)
+Rank Color =
+VAR RankVal = [Rank in Parent]
+RETURN
+SWITCH(
+    TRUE(),
+    RankVal <= 3, "#2B8A3E",    // Green
+    RankVal <= 5, "#E67700",    // Amber
+    "#C92A2A"                   // Red
+)
+
+
+// Color code for % stuck deals
+Stuck % Color =
+SWITCH(
+    TRUE(),
+    [% Stuck Deals] < 0.10, "#2B8A3E",    // Green (<10%)
+    [% Stuck Deals] < 0.25, "#E67700",    // Amber (10-25%)
+    "#C92A2A"                              // Red (>25%)
+)
+
+
+// ──────────────────────────────────────────────────────────────
+// BENCHMARK COMPARISONS
+// ──────────────────────────────────────────────────────────────
+
+// Regional average (for comparison)
+Regional Avg =
+CALCULATE(
+    [Weighted Rev],
+    ALL(DimRM)
+) / DISTINCTCOUNT(DimRM[RM])
+// Format: Currency
+
+
+// vs Regional Avg
+vs Regional Avg =
+[Weighted Rev] - [Regional Avg]
+// Format: Currency
+
+
+// vs Regional Avg %
+vs Regional Avg % =
+DIVIDE([Weighted Rev], [Regional Avg], 0) - 1
+// Format: Percentage
+
+
+// Market leader (name of top RM in market)
+Market Leader =
+VAR CurrentMarket = SELECTEDVALUE(DimRM[Market])
+VAR TopRM =
+    CALCULATE(
+        SELECTEDVALUE(DimRM[RM]),
+        TOPN(1, FILTER(ALL(DimRM[RM]), DimRM[Market] = CurrentMarket), [Weighted Rev], DESC)
+    )
+RETURN
+TopRM
+
+
+// Gap to market leader
+Gap to Leader =
+VAR CurrentMarket = SELECTEDVALUE(DimRM[Market])
+VAR LeaderRev =
+    CALCULATE(
+        MAXX(VALUES(DimRM[RM]), [Weighted Rev]),
+        DimRM[Market] = CurrentMarket
+    )
+RETURN
+LeaderRev - [Weighted Rev]
+// Format: Currency
+
+
+// ──────────────────────────────────────────────────────────────
+// KPI CARDS (formatted for display)
+// ──────────────────────────────────────────────────────────────
+
+Pipeline Card =
+"$" & FORMAT([Weighted Rev] / 1000000, "#,0.0") & "M"
+
+Coverage Card =
+FORMAT([Coverage Ratio], "0.0") & "x coverage"
+
+Deals Card =
+FORMAT([Open Deals], "#,0") & " deals"
+
+Gap Card =
+IF(
+    [Gap to Close] > 0,
+    "$" & FORMAT([Gap to Close] / 1000000, "#,0.0") & "M gap",
+    "✓ Target met"
+)
+
+
+// ──────────────────────────────────────────────────────────────
+// WHAT-IF ANALYSIS
+// ──────────────────────────────────────────────────────────────
+
+// If all stuck deals moved to Commit stage
+Upside if Unstuck =
+VAR CurrentStuckRev = CALCULATE([Weighted Rev], DimAging[RiskLevel] = "At Risk")
+VAR CommitProb = 0.80
+VAR CurrentAvgProb = CALCULATE(AVERAGE(Deals[Probability]), DimAging[RiskLevel] = "At Risk")
+RETURN
+CurrentStuckRev * (CommitProb / CurrentAvgProb - 1)
+// Format: Currency
+
+
+// Deals needed to close gap
+Deals Needed to Close Gap =
+VAR GapAmount = [Gap to Close]
+VAR AvgDealRev = [Avg Deal Size] * 0.034  // Assuming avg is comm loan
+VAR AvgProb = 0.50  // Assuming Proposal stage
+RETURN
+CEILING(GapAmount / (AvgDealRev * AvgProb), 1)
+// Format: Whole number
