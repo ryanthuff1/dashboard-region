@@ -31,13 +31,14 @@ function setScope(newScope) {
 
 // ── Card Registry ────────────────────────────────────────────────
 const cards = [
-  { id: 1, l: 'Scorecard',   t: '① Pipeline Scorecard',                  type: 'html',  build: buildScorecard,  levels: ['region', 'market', 'officer'] },
-  { id: 2, l: 'Coverage',    t: '② Pipeline Coverage vs Revenue Gap',    type: 'chart', build: buildCoverage,   levels: ['region', 'market', 'officer'] },
-  { id: 3, l: 'Funnel',      t: '③ Stage Funnel — Annual & Weighted ($)', type: 'chart', build: buildStageFunnel, levels: ['region', 'market', 'officer'] },
-  { id: 4, l: 'Aging',       t: '④ Aging by Days in Stage',              type: 'chart', build: buildAging,      levels: ['region', 'market', 'officer'] },
-  { id: 5, l: 'By Product',  t: '⑤ Weighted Pipeline by Product',        type: 'chart', build: buildByProduct,  levels: ['region', 'market', 'officer'] },
-  { id: 6, l: 'RM Rank',     t: '⑥ RM Ranking — Weighted Pipeline',      type: 'chart', build: buildRMRanking,  levels: ['region', 'market'] },
-  { id: 7, l: 'Top Deals',   t: '⑦ Top 10 Deals (by Weighted Rev)',      type: 'html',  build: buildTopDeals,   levels: ['region', 'market', 'officer'] },
+  { id: 1, l: 'Scorecard',   t: '① Pipeline Scorecard',                  type: 'html',  build: buildScorecard,    levels: ['region', 'market', 'officer'] },
+  { id: 2, l: 'Coverage',    t: '② Pipeline Coverage vs Revenue Gap',    type: 'chart', build: buildCoverage,     levels: ['region', 'market', 'officer'] },
+  { id: 3, l: 'Funnel',      t: '③ Stage Funnel — Annual & Weighted ($)', type: 'chart', build: buildStageFunnel,  levels: ['region', 'market', 'officer'] },
+  { id: 4, l: 'Aging',       t: '④ Aging by Days in Stage',              type: 'chart', build: buildAging,        levels: ['region', 'market', 'officer'] },
+  { id: 5, l: 'By Product',  t: '⑤ Weighted Pipeline by Product',        type: 'chart', build: buildByProduct,    levels: ['region', 'market', 'officer'] },
+  { id: 6, l: 'RM Rank',     t: '⑥ RM Ranking — Weighted Pipeline',      type: 'chart', build: buildRMRanking,    levels: ['region', 'market'] },
+  { id: 7, l: 'Top Deals',   t: '⑦ Top 10 Deals (by Weighted Rev)',      type: 'html',  build: buildTopDeals,     levels: ['region', 'market', 'officer'] },
+  { id: 8, l: 'Closed YTD',  t: '⑧ Closed YTD Deals',                    type: 'html',  build: buildClosedDeals,  levels: ['region', 'market', 'officer'] },
 ];
 
 // ── Scope label helpers ──────────────────────────────────────────

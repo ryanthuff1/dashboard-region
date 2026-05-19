@@ -44,14 +44,17 @@ def format_date(date_str):
     """Convert ISO date string to datetime object."""
     return datetime.strptime(date_str, '%Y-%m-%d')
 
-def populate_deals_sheet(wb, deals):
-    """Populate or update the Deals sheet with pipeline data."""
+def populate_pipeline_sheet(wb, deals):
+    """Populate Active Pipeline sheet with open deals only."""
 
-    # If 'Deals' sheet exists, delete and recreate to avoid merged cell issues
-    if 'Deals' in wb.sheetnames:
-        del wb['Deals']
+    # Filter to open deals only
+    open_deals = [d for d in deals if d['stage'] != 'Closed']
 
-    ws = wb.create_sheet('Deals', 1)
+    # Remove old sheet if exists
+    if 'Active Pipeline' in wb.sheetnames:
+        del wb['Active Pipeline']
+
+    ws = wb.create_sheet('Active Pipeline', 1)
 
     # Define headers
     headers = [
@@ -94,9 +97,9 @@ def populate_deals_sheet(wb, deals):
         'Other': 'Other Fees',
     }
 
-    # Write deal data
+    # Write deal data (open deals only)
     row = 2
-    for deal in deals:
+    for deal in open_deals:
         ws.cell(row, 1, deal['id'])
         ws.cell(row, 2, deal['officerId'])
         ws.cell(row, 3, officer_names.get(deal['officerId'], deal['officerId']))
@@ -149,7 +152,106 @@ def populate_deals_sheet(wb, deals):
     # Freeze header row
     ws.freeze_panes = 'A2'
 
-    print(f"✓ Populated {len(deals)} deals in 'Deals' sheet")
+    print(f"✓ Populated {len(open_deals)} open deals in 'Active Pipeline' sheet")
+    return ws
+
+def populate_closed_sheet(wb, deals):
+    """Populate Closed YTD sheet with closed deals."""
+
+    # Filter to closed deals only
+    closed_deals = [d for d in deals if d['stage'] == 'Closed']
+
+    # Remove old sheet if exists
+    if 'Closed YTD' in wb.sheetnames:
+        del wb['Closed YTD']
+
+    ws = wb.create_sheet('Closed YTD', 2)
+
+    # Define headers (same as pipeline sheet)
+    headers = [
+        'Deal ID', 'Officer ID', 'Officer Name', 'Market', 'Customer',
+        'Product', 'Stage', 'Amount', 'Probability', 'Days in Stage',
+        'Age (Days)', 'Close Date', 'Annual Revenue'
+    ]
+
+    # Style for headers (green theme for closed)
+    header_fill = PatternFill(start_color='2b8a3e', end_color='2b8a3e', fill_type='solid')
+    header_font = Font(bold=True, color='FFFFFF', size=11)
+    border = Border(bottom=Side(style='thin', color='dee2e6'))
+
+    # Write headers
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(1, col_idx, header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='left', vertical='center')
+        cell.border = border
+
+    # Officer name mapping
+    officer_names = {
+        'h-reyes': 'M. Reyes',
+        'h-patel': 'D. Patel',
+        'h-tran': 'A. Tran',
+        'h-williams': 'K. Williams',
+        'd-chen': 'R. Chen',
+        'd-garcia': 'S. Garcia',
+        'd-foster': 'B. Foster',
+    }
+
+    # Product label mapping
+    product_labels = {
+        'CommLoan': 'Commercial Loan',
+        'Deposits': 'Deposits',
+        'TM': 'Treasury Management',
+        'Other': 'Other Fees',
+    }
+
+    # Write closed deal data
+    row = 2
+    for deal in closed_deals:
+        ws.cell(row, 1, deal['id'])
+        ws.cell(row, 2, deal['officerId'])
+        ws.cell(row, 3, officer_names.get(deal['officerId'], deal['officerId']))
+        ws.cell(row, 4, deal['market'])
+        ws.cell(row, 5, deal['customer'])
+        ws.cell(row, 6, product_labels.get(deal['product'], deal['product']))
+        ws.cell(row, 7, deal['stage'])
+
+        # Amount as number
+        amount_cell = ws.cell(row, 8, deal['amount'])
+        amount_cell.number_format = '$#,##0.00'
+
+        # Probability (always 100% for closed)
+        prob_cell = ws.cell(row, 9, 1.0)
+        prob_cell.number_format = '0%'
+
+        ws.cell(row, 10, deal['daysInStage'])
+        ws.cell(row, 11, deal['ageDays'])
+
+        # Close date
+        close_cell = ws.cell(row, 12, format_date(deal['expectedClose']))
+        close_cell.number_format = 'mm/dd/yyyy'
+
+        # Annual revenue
+        rev_cell = ws.cell(row, 13, deal['revAnnual'])
+        rev_cell.number_format = '$#,##0.00'
+
+        row += 1
+
+    # Adjust column widths
+    column_widths = {
+        'A': 14, 'B': 12, 'C': 14, 'D': 10, 'E': 20,
+        'F': 18, 'G': 12, 'H': 14, 'I': 12, 'J': 14,
+        'K': 12, 'L': 14, 'M': 16,
+    }
+
+    for col, width in column_widths.items():
+        ws.column_dimensions[col].width = width
+
+    # Freeze header row
+    ws.freeze_panes = 'A2'
+
+    print(f"✓ Populated {len(closed_deals)} closed deals in 'Closed YTD' sheet")
     return ws
 
 def add_summary_sheet(wb, deals):
@@ -188,17 +290,18 @@ def add_summary_sheet(wb, deals):
     ws.cell(row, 2, 'Value').font = header_font
 
     metrics = [
-        ('Total Deals', len(deals)),
+        ('── ACTIVE PIPELINE ──', ''),
         ('Open Deals', len(open_deals)),
-        ('Closed Deals', len(closed_deals)),
-        ('', ''),
         ('Total Pipeline (Balance)', total_pipeline),
         ('Weighted Pipeline', weighted_pipeline),
         ('Total Revenue Potential', total_revenue),
         ('Weighted Revenue', weighted_revenue),
-        ('Closed Revenue', closed_revenue),
         ('', ''),
-        ('Stage Breakdown:', ''),
+        ('── CLOSED YTD ──', ''),
+        ('Closed Deals', len(closed_deals)),
+        ('Closed Revenue (YTD)', closed_revenue),
+        ('', ''),
+        ('── STAGE BREAKDOWN ──', ''),
     ]
 
     row = 4
@@ -238,14 +341,26 @@ def main():
     print(f"✓ Loading workbook: {WORKBOOK_PATH.name}")
     wb = load_workbook(WORKBOOK_PATH)
 
+    # Remove old 'Deals' sheet if it exists (legacy)
+    if 'Deals' in wb.sheetnames:
+        del wb['Deals']
+        print("✓ Removed legacy 'Deals' sheet")
+
     # Populate sheets
-    populate_deals_sheet(wb, deals)
+    populate_pipeline_sheet(wb, deals)
+    populate_closed_sheet(wb, deals)
     add_summary_sheet(wb, deals)
+
+    # Count splits
+    open_count = len([d for d in deals if d['stage'] != 'Closed'])
+    closed_count = len([d for d in deals if d['stage'] == 'Closed'])
 
     # Save workbook
     wb.save(WORKBOOK_PATH)
     print(f"\n✅ Workbook saved: {WORKBOOK_PATH}")
-    print(f"   {len(deals)} deals synced from dashboard\n")
+    print(f"   {len(deals)} total deals synced from dashboard")
+    print(f"   → {open_count} in 'Active Pipeline'")
+    print(f"   → {closed_count} in 'Closed YTD'\n")
 
 if __name__ == '__main__':
     main()

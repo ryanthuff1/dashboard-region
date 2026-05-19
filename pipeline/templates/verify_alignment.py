@@ -28,18 +28,32 @@ def main():
     summary = wb['Summary']
     print("✓ Summary sheet found")
 
-    # Check Deals sheet
-    if 'Deals' not in wb.sheetnames:
-        print("❌ Deals sheet not found")
+    # Check Active Pipeline sheet
+    if 'Active Pipeline' not in wb.sheetnames:
+        print("❌ Active Pipeline sheet not found")
         return False
 
-    deals_sheet = wb['Deals']
-    excel_row_count = deals_sheet.max_row - 1  # Subtract header row
+    pipeline_sheet = wb['Active Pipeline']
+    pipeline_row_count = pipeline_sheet.max_row - 1  # Subtract header row
 
-    print(f"✓ Deals sheet found")
+    print(f"✓ Active Pipeline sheet found")
+
+    # Check Closed YTD sheet
+    if 'Closed YTD' not in wb.sheetnames:
+        print("❌ Closed YTD sheet not found")
+        return False
+
+    closed_sheet = wb['Closed YTD']
+    closed_row_count = closed_sheet.max_row - 1  # Subtract header row
+
+    print(f"✓ Closed YTD sheet found")
+
+    excel_row_count = pipeline_row_count + closed_row_count
     print(f"\nDeal counts:")
-    print(f"  JSON:  {len(json_deals)} deals")
-    print(f"  Excel: {excel_row_count} deals")
+    print(f"  JSON:  {len(json_deals)} deals total")
+    print(f"  Excel: {excel_row_count} deals total")
+    print(f"    → Active Pipeline: {pipeline_row_count} deals")
+    print(f"    → Closed YTD: {closed_row_count} deals")
 
     if len(json_deals) == excel_row_count:
         print("  ✓ Counts match!")
@@ -68,17 +82,26 @@ def main():
     for stage in stages:
         print(f"  {stage:12s}: {stage_counts[stage]:2d} deals")
 
-    # Sample some deals from Excel to verify data integrity
-    print(f"\n✓ Sampling deals from Excel:")
-    for row in range(2, min(5, deals_sheet.max_row + 1)):
-        deal_id = deals_sheet.cell(row, 1).value
-        officer = deals_sheet.cell(row, 3).value
-        customer = deals_sheet.cell(row, 5).value
-        stage = deals_sheet.cell(row, 7).value
-        amount = deals_sheet.cell(row, 8).value
+    # Sample some deals from each sheet to verify data integrity
+    print(f"\n✓ Sampling active pipeline deals:")
+    for row in range(2, min(4, pipeline_sheet.max_row + 1)):
+        deal_id = pipeline_sheet.cell(row, 1).value
+        officer = pipeline_sheet.cell(row, 3).value
+        customer = pipeline_sheet.cell(row, 5).value
+        stage = pipeline_sheet.cell(row, 7).value
+        amount = pipeline_sheet.cell(row, 8).value
         print(f"  {deal_id:15s} | {officer:12s} | {customer:20s} | {stage:10s} | ${amount:>12,.2f}")
 
-    print(f"\n✅ Verification complete! Excel and dashboard data are aligned.\n")
+    print(f"\n✓ Sampling closed YTD deals:")
+    for row in range(2, min(4, closed_sheet.max_row + 1)):
+        deal_id = closed_sheet.cell(row, 1).value
+        officer = closed_sheet.cell(row, 3).value
+        customer = closed_sheet.cell(row, 5).value
+        stage = closed_sheet.cell(row, 7).value
+        amount = closed_sheet.cell(row, 8).value
+        print(f"  {deal_id:15s} | {officer:12s} | {customer:20s} | {stage:10s} | ${amount:>12,.2f}")
+
+    print(f"\n✅ Verification complete! Excel has proper Active Pipeline / Closed YTD separation.\n")
     return True
 
 if __name__ == '__main__':

@@ -337,3 +337,45 @@ function buildTopDeals(container) {
   html += '</tbody></table>';
   container.innerHTML = html;
 }
+
+// ── ⑧ Closed YTD Deals table ──────────────────────────────────────
+function buildClosedDeals(container) {
+  const closedDeals = deals.filter(d => d.stage === 'Closed');
+
+  if (closedDeals.length === 0) {
+    container.innerHTML = '<p style="color:#78716c;font-size:11px;padding:8px">No closed deals in scope.</p>';
+    return;
+  }
+
+  // Sort by close date (most recent first)
+  closedDeals.sort((a, b) => b.expectedClose - a.expectedClose);
+
+  let html = `<table class="deals-table"><thead><tr>
+    <th>Customer</th><th>RM</th><th>Product</th>
+    <th>Balance</th><th>Annual Rev</th><th>Close Date</th>
+  </tr></thead><tbody>`;
+
+  closedDeals.forEach(d => {
+    const rm = officers.find(o => o.id === d.officerId);
+    const closeDate = d.expectedClose.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    html += `<tr>
+      <td style="font-weight:600">${d.customer}</td>
+      <td style="color:#78716c">${rm ? rm.name : '?'}</td>
+      <td><span class="prod-tag" style="background:${PRODUCT_COL[d.product]}22;color:${PRODUCT_COL[d.product]}">${PRODUCT_LABEL[d.product]}</span></td>
+      <td style="color:#78716c">${fmt$(d.amount)}</td>
+      <td style="font-weight:700;color:${COL.green}">${fmt$(d.revAnnual)}</td>
+      <td style="color:#78716c">${closeDate}</td>
+    </tr>`;
+  });
+
+  // Add summary row
+  const totalRev = closedDeals.reduce((s, d) => s + d.revAnnual, 0);
+  html += `<tr style="border-top:2px solid #212529;font-weight:700">
+    <td colspan="4">TOTAL CLOSED YTD</td>
+    <td style="color:${COL.green}">${fmt$(totalRev)}</td>
+    <td style="color:#78716c">${closedDeals.length} deals</td>
+  </tr>`;
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}

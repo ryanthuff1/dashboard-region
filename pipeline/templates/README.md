@@ -25,8 +25,9 @@ python3 pipeline/templates/sync_excel.py
 ```
 
 This reads `deals.json` and populates the Excel workbook with:
-- **Deals sheet**: All 76 deals with full details (ID, officer, market, customer, product, stage, amount, probability, days in stage, expected close date, annual revenue)
-- **Summary sheet**: Key metrics (total deals, pipeline balance, weighted revenue, stage breakdown)
+- **Active Pipeline sheet**: Open deals only (67 deals) - these are deals actively being worked
+- **Closed YTD sheet**: Closed deals (9 deals) - kept separate as reference data, not part of active pipeline
+- **Summary sheet**: Key metrics broken down by active pipeline vs closed YTD
 
 ### 3. Verify alignment (optional)
 
@@ -40,13 +41,24 @@ This confirms that the Excel data matches the dashboard exactly.
 
 From the dashboard's `data.js`:
 - **7 officers** across Houston (4) and Dallas (3) markets
-- **76 deals** distributed by officer performance:
+- **76 deals total** distributed by officer performance:
+  - **67 active pipeline deals** (Lead, Qualified, Proposal, Commit stages)
+  - **9 closed YTD deals** (Closed stage - kept separate for reference)
+- **Active pipeline** includes:
   - Strong performers (adj > 1.0) carry more late-stage deals
   - Weak performers (adj < 0.9) have more early-stage, stuck deals
 - **5 stages**: Lead, Qualified, Proposal, Commit, Closed
 - **4 products**: Commercial Loan, Deposits, Treasury Management, Other Fees
 - **Probability weighting** by stage (Lead 10%, Qualified 25%, Proposal 50%, Commit 80%, Closed 100%)
 - **Annual revenue** calculated from deal amounts using product-specific conversion ratios
+
+### Important: Active Pipeline vs Closed YTD
+
+The Excel workbook **separates active pipeline from closed deals**:
+- **Active Pipeline** sheet contains only open deals being actively worked
+- **Closed YTD** sheet contains deals already won (reference data only)
+- This separation ensures pipeline metrics focus on forward-looking opportunities
+- Closed revenue is still tracked and reported, but separately
 
 ## 🎯 Use Cases
 
