@@ -47,7 +47,7 @@ const cards = [
 
 // ── Scope label helpers ──────────────────────────────────────────
 function scopeTitle() {
-  if (scope.level === 'region') return 'Texas Region';
+  if (scope.level === 'region') return 'West Region';
   if (scope.level === 'market') return scope.market;
   const o = officers.find(x => x.id === scope.officerId);
   return o ? `${o.name} · ${o.market}` : '?';
@@ -127,11 +127,11 @@ function renderDrill() {
 
   // Build breadcrumb based on current level
   if (scope.level === 'region') {
-    addCrumb('Region', null, true);
+    addCrumb('West Region', null, true);
     addDivider();
     markets.forEach(m => addChildBtn(m, () => setScope({ level: 'market', market: m })));
   } else if (scope.level === 'market') {
-    addCrumb('Region', () => setScope({ level: 'region' }), false);
+    addCrumb('West Region', () => setScope({ level: 'region' }), false);
     addSep();
     addCrumb(scope.market, null, true);
     addDivider();
@@ -140,7 +140,7 @@ function renderDrill() {
     });
   } else {  // officer
     const o = officers.find(x => x.id === scope.officerId);
-    addCrumb('Region', () => setScope({ level: 'region' }), false);
+    addCrumb('West Region', () => setScope({ level: 'region' }), false);
     addSep();
     addCrumb(scope.market, () => setScope({ level: 'market', market: scope.market }), false);
     addSep();
