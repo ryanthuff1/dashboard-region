@@ -22,18 +22,24 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.utils import get_column_letter
 from pathlib import Path
+from datetime import date, timedelta
+import json
 
-OUT_PATH = Path(__file__).parent / "RM-pipeline-template.xlsx"
+OUT_PATH   = Path(__file__).parent / "RM-pipeline-template.xlsx"
+DEALS_PATH = Path(__file__).parent / "deals.json"
+
+# AS_OF mirrors pipeline/js/config.js (June 30, 2026).
+AS_OF = date(2026, 6, 30)
 
 # Roster (matches pipeline/js/data.js)
 OFFICERS = [
-    {"name": "M. Reyes",    "market": "Houston"},
-    {"name": "D. Patel",    "market": "Houston"},
-    {"name": "A. Tran",     "market": "Houston"},
-    {"name": "K. Williams", "market": "Houston"},
-    {"name": "R. Chen",     "market": "Dallas"},
-    {"name": "S. Garcia",   "market": "Dallas"},
-    {"name": "B. Foster",   "market": "Dallas"},
+    {"id": "h-reyes",    "name": "M. Reyes",    "market": "Houston"},
+    {"id": "h-patel",    "name": "D. Patel",    "market": "Houston"},
+    {"id": "h-tran",     "name": "A. Tran",     "market": "Houston"},
+    {"id": "h-williams", "name": "K. Williams", "market": "Houston"},
+    {"id": "d-chen",     "name": "R. Chen",     "market": "Dallas"},
+    {"id": "d-garcia",   "name": "S. Garcia",   "market": "Dallas"},
+    {"id": "d-foster",   "name": "B. Foster",   "market": "Dallas"},
 ]
 
 PRODUCTS = ["Comm Loan", "Deposits", "Treasury Mgmt", "Other Fees"]
@@ -41,7 +47,15 @@ STAGES   = ["Lead", "Qualified", "Proposal", "Commit", "Closed"]
 STAGE_PROB    = {"Lead": 0.10, "Qualified": 0.25, "Proposal": 0.50, "Commit": 0.80, "Closed": 1.00}
 PRODUCT_RATIO = {"Comm Loan": 0.034, "Deposits": 0.005, "Treasury Mgmt": 1.0, "Other Fees": 1.0}
 
-DEAL_ROWS = 30  # blank rows pre-formatted per RM tab
+# Internal JS product codes → user-facing label used in the workbook
+PRODUCT_LABEL = {
+    "CommLoan": "Comm Loan",
+    "Deposits": "Deposits",
+    "TM":       "Treasury Mgmt",
+    "Other":    "Other Fees",
+}
+
+DEAL_ROWS = 30  # rows pre-formatted per RM tab
 
 # ── Styles ─────────────────────────────────────────────────────────
 HEADER_FONT  = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
@@ -140,7 +154,7 @@ RM_COL_WIDTHS = [26, 16, 14, 14, 12, 18, 12, 14, 16, 16, 40]
 COL = {h: get_column_letter(i+1) for i, h in enumerate(RM_HEADERS)}
 LAST_DATA_ROW = 1 + DEAL_ROWS  # row 31 if DEAL_ROWS=30
 
-def build_rm_tab(officer):
+def build_rm_tab(officer, officer_deals):
     name = officer["name"]
     ws = wb.create_sheet(name)
 
@@ -161,15 +175,44 @@ def build_rm_tab(officer):
         ws.column_dimensions[get_column_letter(i)].width = w
     ws.row_dimensions[2].height = 22
 
-    # Fill formulas + formats for rows 3 .. LAST_DATA_ROW+1
+    # Fill rows 3 .. LAST_DATA_ROW+1. The first N rows get pre-populated
+    # with synthetic deal data; the remaining rows are blank with formulas
+    # ready to activate when an RM fills them in.
     for r in range(3, LAST_DATA_ROW + 2):
-        # Probability (E): VLOOKUP stage on Lookup, but blank if stage blank
-        ws.cell(row=r, column=5,
-                value=f'=IF(C{r}="","",VLOOKUP(C{r},Lookup!$D$2:$E$6,2,FALSE))')
+        idx = r - 3  # 0-based deal index
+        has_deal = idx < len(officer_deals)
+        d = officer_deals[idx] if has_deal else None
+
+        if has_deal:
+            # Customer / Product / Stage / Amount as plain values
+            ws.cell(row=r, column=1, value=d["customer"])
+            ws.cell(row=r, column=2, value=PRODUCT_LABEL[d["product"]])
+            ws.cell(row=r, column=3, value=d["stage"])
+            ws.cell(row=r, column=4, value=round(d["amount"], 2))
+
+            # Probability — write the per-deal probability (data.js varies
+            # ±5% around the stage default) as a hard value. Overrides the
+            # VLOOKUP formula that empty rows carry.
+            ws.cell(row=r, column=5, value=round(d["probability"], 4))
+
+            # Date Entered Stage = AS_OF - daysInStage
+            date_entered = AS_OF - timedelta(days=int(d["daysInStage"]))
+            ws.cell(row=r, column=6, value=date_entered)
+
+            # Expected Close: parse YYYY-MM-DD from the JSON
+            y, m, dy = d["expectedClose"].split("-")
+            ws.cell(row=r, column=8, value=date(int(y), int(m), int(dy)))
+        else:
+            # Empty row — formulas for Probability so it auto-fills on Stage entry
+            ws.cell(row=r, column=5,
+                    value=f'=IF(C{r}="","",VLOOKUP(C{r},Lookup!$D$2:$E$6,2,FALSE))')
+
+        # Probability cell styling (regardless of value vs formula)
         ws.cell(row=r, column=5).fill = CALC_FILL
         ws.cell(row=r, column=5).number_format = "0%"
 
-        # Days in Stage (G): TODAY() - Date Entered Stage
+        # Days in Stage (G): always a formula. For populated rows it computes
+        # TODAY()-Date Entered Stage (will age over time as expected).
         ws.cell(row=r, column=7,
                 value=f'=IF(F{r}="","",TODAY()-F{r})')
         ws.cell(row=r, column=7).fill = CALC_FILL
@@ -188,9 +231,9 @@ def build_rm_tab(officer):
         ws.cell(row=r, column=10).number_format = '"$"#,##0'
 
         # Number/date formats for inputs
-        ws.cell(row=r, column=4).number_format = '"$"#,##0'         # Amount
-        ws.cell(row=r, column=6).number_format = "m/d/yyyy"         # Date Entered Stage
-        ws.cell(row=r, column=8).number_format = "m/d/yyyy"         # Expected Close
+        ws.cell(row=r, column=4).number_format = '"$"#,##0'
+        ws.cell(row=r, column=6).number_format = "m/d/yyyy"
+        ws.cell(row=r, column=8).number_format = "m/d/yyyy"
 
         # Light row banding for readability
         if r % 2 == 0:
@@ -316,12 +359,23 @@ def build_summary():
     ws.freeze_panes = "A3"
 
 
+# ── Load deals.json (produced by dump_deals.js) ────────────────────
+deals_by_officer = {o["id"]: [] for o in OFFICERS}
+if DEALS_PATH.exists():
+    with open(DEALS_PATH) as f:
+        for d in json.load(f):
+            if d["officerId"] in deals_by_officer:
+                deals_by_officer[d["officerId"]].append(d)
+else:
+    print(f"WARN: {DEALS_PATH} not found — RM tabs will be empty.")
+    print("      Run: node pipeline/templates/dump_deals.js > pipeline/templates/deals.json")
+
 # ── Build in tab order: README, Summary, RM tabs, (hidden Lookup) ──
 build_readme()
 build_summary()
 build_lookup()
 for o in OFFICERS:
-    build_rm_tab(o)
+    build_rm_tab(o, deals_by_officer[o["id"]])
 
 # Move sheets into desired order: README, Summary, RM tabs..., Lookup (hidden, last)
 ordered = ["README", "Summary"] + [o["name"] for o in OFFICERS] + ["Lookup"]
